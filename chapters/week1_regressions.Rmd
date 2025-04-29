@@ -1,0 +1,326 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, message=FALSE}
+library(pacman)
+pacman::p_load(ISLR2, ggplot2, plotly)
+```
+
+
+Throughout this course, we will work with the "A Introduction to Statistical Learning" book including some of the datasets used in the book (2nd edition). Current notebook on univariate and multivariate linear regression is covered in chapter 3 of the book.
+
+
+
+### WEEK 1
+#### REGRESSIONS
+
+We will start the course with an overview and application of linear regression. Linear regression is a tool in statistics and machine learning for predicting a continuous outcome \( y_i \) based on an input variable \( x_i \) using the ordinary least squares (OLS) method (more on this later). The goal of OLS algorithm is to find the coefficients for input variables to predict the best outcome assuming there is a linear relationship between variables.
+
+In the formula below, y is the dependent variable or outcome variables, \( \beta_0 \) is the constant term or the y-intercept, and \( \beta_1 \) is slope of the regression line.
+
+\[ y = \beta_0 + \beta_1 x + \epsilon \]
+
+**Simple Linear Regression**
+We will first model a simple linear regression, which means we will use only one input variable, or predictor to predict the outcome variable. Let's load the `Auto` dataset from the `ISLR2` package and explore the variables.
+```{r}
+# load ISLR2 package
+library(ISLR2)
+# load 'Auto' dataset
+Auto <- ISLR2::Auto
+names(Auto)
+```
+
+For this analysis, we want to explore the relationship between fuel consumption of a car (`mpg`) and other variables. The goal of the regression model is to estimate fuel consumption as a function of one these variables, in our case `horsepower.`
+
+
+
+```{r}
+# fit a model to the data
+model <- lm(mpg ~ horsepower, data = Auto)
+# get the summary statistics of the model
+summary(model)
+```
+
+__Visualizing the fitted line and model__
+
+Scatterplots are a useful tool when it comes to visualizing the relationship between a predictor and the response variable. The red line below is the regression line that OLS found to be the best fit.
+
+```{r}
+# visualize the model as a scatterplot and fit the regression line
+library(ggplot2)
+ggplot(data = Auto, aes(x = horsepower, y = mpg)) +
+  geom_point(color = 'blue') +  # scatter plot of data points
+  geom_smooth(method = "lm", formula = y ~ x, color = 'red') +  # regression line
+  labs(title = "Regression of MPG on Horsepower",
+       x = "Horsepower",
+       y = "MPG") +
+  theme_minimal()
+```
+
+**Ordinary Least Squares**
+How is the regression line that's fitted to our data determined? In other words, what is the function _f_ that gives us a coefficient for the `horsepower` variable that estimates the outcome variable `mpg`?
+
+Ordinary least squares or OLS, which we alluded before, is an optimization algorithm that finds the function that minimizes the sum of squares of the difference between the actual and predicted values - what is called the 'residuals'. Residuals are squared to cancel out the impact of the negative and positive values. 
+
+
+**Interpreting the summary statistics of the model** 
+
+When evaluating the estimated coefficients of the regression, we look at and interpret two main indicators. 
+
+__Coefficients__:
+
+The model tells us `horsepower` as a predictor has a negative relationship with `mpg.` With each one unit increase in `horsepower`, `mpg` decreases by 0.1578. 
+
+The __p-value__ associated with the coefficient `horsepower`also suggests that it is statistically significant, with 2e-16 < 0,05 - the rule of thumb threshold for p-values.
+
+How to interpret the p-value? 
+
+Another metric that gives us guidance whether an input variable is important and should be kept in the model is the **t-statistic**, which is the mirror image of the p-value. A high t-statistic (and by contrast a low p-value) indicates statistical significance. 
+
+__Goodness of the fit of the model__: How do we determine if the regression model we fit to the data is adequate and can do a job of predicting previously unseen data? A common metric that measures how well the model fits the data is **R-squared**, also known as coefficient of determination. The R-squared score, which is between 0 and 1, tells us what percentage of variance (difference between the estimated and the actual value) is accounted for by the model. In the case of our example, the model explains roughly 61 percent of the variability.
+
+```{r}
+# scatterplot of the residuals
+residuals <- residuals(model)
+fitted_values <- fitted(model)
+
+# Create a scatterplot of the residuals
+plot(fitted_values, residuals,
+     main = "Residual Plot",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     pch = 20, col = "blue")
+abline(h = 0, col = "red", lty = 2, lwd = 2)  # Add a horizontal line at y=0
+
+# Optional: Add a grid
+grid()
+```
+
+
+
+
+
+## Multiple Linear Regression
+
+Now let's observe what happens when we increase the number of predictors we use to estimate their relationship to the outcome variable. In addition to `horsepower`, we will also add `year`of the car to the model and see how good a job predictors do at explaining `mpg`. 
+
+
+\[ 
+y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots + \beta_p x_p + \epsilon 
+\]
+
+In this context, while estimating the relationship between \beta_1 and the response variable, the regression model keeps the other variables constant. Importantly, multiple linear regression assumes that variables are independent from each other, and it does not allow estimating the interaction between variables themselves.
+
+Let's see how it plays out by adding the `year`variable to our previous regression model. 
+
+```{r}
+# fit a model to the data
+model2 <- lm(mpg ~ horsepower + year, data = Auto)
+# get the summary statistics of the model
+summary(model2)
+```
+Compared to the first model where we regressed `mpg` on `horsepower`, this model with two  predictors seems to suggest a stronger fit based on a higher R-squared score of 68 percent. Looking at the coefficients, we can also claim: 
+
+Cars with older models consume more fuel. With every added unit of year, `mpg`increases by 0.66. So there is a positive linear relationship between the two.
+
+**Regression with more than 2 variable**
+
+When use two or more variables to predict an outcome, the dimensionality of the model changes. If we plot the regression model above, we will get the fit as a plane - a three dimensional space with y axis representing `mpg`, x axis `horsepower`and z axis `year`. At this stage it's still possible for the human mind to visualize 3D space, but as we increase the number of predictors in the model beyond two, it's not going to be possible to plot the fit as a graph.
+
+Below is the code for visualizing the model as a plane in 3D space. In linear algebraic terms, the outcome variable `mpg` in this model is going to be the dot product of each observation of the `horsepower` and `year` variables. Therefore we first need to create a grid before plotting the model to allow for matrix multiplication.
+
+```{r}
+# create a grid of values for horsepower and year to predict mpg
+hp_range <- seq(min(Auto$horsepower), max(Auto$horsepower), length.out = 30)
+year_range <- seq(min(Auto$year), max(Auto$year), length.out = 30)
+grid <- expand.grid(horsepower = hp_range, year = year_range)
+
+library(plotly)
+# predict mpg for each combination of horsepower and year in the grid
+grid$mpg <- predict(model2, newdata = grid)
+# Predict mpg for the actual data points to get residuals
+Auto$predicted_mpg <- predict(model2, newdata = Auto)
+# create the 3D plot
+# Create the 3D plot
+plot_ly() %>%
+  add_markers(data = Auto, x = ~horsepower, y = ~year, z = ~mpg, color = I("blue"), name = "Data Points") %>%
+  add_surface(x = ~hp_range, y = ~year_range, z = matrix(grid$mpg, nrow = 30, byrow = TRUE), name = "Regression Plane", colorscale = list(c(0, 'rgb(200,200,200)'), c(1, 'rgb(255,255,255)'))) %>%
+  layout(scene = list(xaxis = list(title = "Horsepower"),
+                      yaxis = list(title = "Year"),
+                      zaxis = list(title = "MPG")),
+         title = "3D Regression Plane")
+```
+
+
+What if we want to use yet more variables in our regression model? We won't be able to visualize high dimensional models but let's observe how more variables can be utilized to predict the outcome and how the model's performance changes with that.
+
+```{r}
+# fit a model to the data with 3 variables
+model3 <- lm(mpg ~ horsepower + year + weight, data = Auto)
+# get the summary statistics of the model
+summary(model3)
+```
+
+Compared to the previous model where we used only `horsepower` and `year` to estimate `mpg`, in the current model where we also added `weight` to the mix, coefficients seem to have changed. Both `horsepower` and `year` now have lower weights compared to the previous model although the direction of the respective relationship remains the same. In addition, notice that R-squared score is getting higher, meaning the model explains yet more portion of the variability in the data. 
+
+Now let's create a model where we include all the variables bar `name.` 
+
+```{r}
+# fit a model to the data with all variables apart from name
+model_all <- lm(mpg ~ . -name -predicted_mpg, data = Auto)
+# get the summary statistics of the model
+summary(model_all)
+```
+
+With more variables added, the model gets more complicated and its ability to predict the true relationship between an input and the outcome decreases. How do we know this? Notice that as we add more input variables, R-squared increases even higher. At the same time, statistical significance of the input variables (p-value and t-statistic) suffer. Hence, R-squared is hardlya true indicator of the explainability of the variance of the model. Including way too many terms in a regression model will lead to a higher R-squared and thus to overfitting. 
+
+
+**Model Accuracy: In-Sample and Out-of-Sample Error** 
+
+Previously we alluded to R-squared as a measure of the performance of our model. While R-squared is a useful metric that helps us determine the goodness of the fit, it does not provide information as to how accurate the model's predictions are in matching true responses. To get that information from our model, we will need to get help from some sort of loss function that minimizes the error rate of the model. Mean Squared Error, or the MSE, is a commonly used loss function that gives us the accuracy rate of our training model when applied to new unforseen data. 
+
+\text{MSE} = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+
+The MSE is not among the summary statistics R gives us about the model. Therefore we will create a function to compute the mean squared difference between the actual and predicted values.
+
+```{r}
+# get the predicted values for the first model
+y_hat <- predict(model, newdata = Auto)
+# create the function that calculates the MSE
+MSE <- function(y, y_hat){
+  MSE = mean((y-y_hat)^2)
+  return (MSE)
+}
+# compute the MSE
+MSE_model<-MSE(Auto$mpg, y_hat)
+print(MSE_model)
+```
+
+How to interpret this result? Unlike R-squared, there isn't a range for the MSE score. The interpretation of MSE will depend on the data. Generally speaking, though, we are interested in a lower MSE score.
+
+Is this MSE score that we just calculated for the first regression model useful? Not really, since as machine learning practitioners we are interested in making predictions on data points that our model has not seen yet, not the dataset that we trained our model on. The MSE score we just got was our **in-sample error rate**. By this logic, **out-of-sample error rate** is the MSE we get when we use the model on a previously unseen dataset, which is the test data. 
+
+Let's now split the data into train and test and calculate the MSE scores on both. 
+
+```{r}
+# set seed for reproducibility
+set.seed(2)
+# split the dataset into train and test
+n  = nrow(Auto) # Number of observations in the dataset
+nT = n*0.8 # training 
+nV = n*0.2 # validation
+# define training and test set
+train_sample = sample(n,nT) # indices for training data
+train_data = Auto[train_sample,] # training dataset
+test_data = Auto[-train_sample ,] # test dataset
+
+# fit the model and calculate MSE on the training data
+fit.lm <- lm(mpg ~ horsepower, data=train_data)
+
+y_hat <- predict(fit.lm, newdata=train_data)
+train_MSE <- MSE(train_data$mpg, y_hat)
+print(train_MSE)
+```
+
+
+
+Now do the same operations on the test set.
+
+```{r}
+testfit.lm <- lm(mpg ~horsepower, data=test_data)
+
+y_hat_test <- predict(testfit.lm, newdata = test_data)
+test_mse <- MSE(test_data$mpg, y_hat_test)
+print(test_mse)
+```
+
+The MSE results are back and it looks like we've got a lower score on our test set, which is not ideal. We will address this issue later and come up with solutions for finding a better approach for selecting the model with the best performance i.e. lowest error rate (hint: cross validation). For the time being, the most important thing to know about MSE is that a low MSE does not guarantee that the test MSE will also be low. Therefore we need to find a more stable and robust solution. 
+
+**Experimenting with the model: playing around with flexibility** 
+
+The main conundrum of the MSE approach is that it's not always possible to calculate the out-of-sample error as in real life, we may not readily have the test data. In that case, one solution is to minimize the in-sample error, or the MSE of the training data. But how? Experimenting with the degree of the polynomial (the multivariate regression equation) is one way of ensuring a fit -in this case, a curve- that accommodates more observations and reduce prediction errors. 
+
+Let's see what happens when we fit different curves to our training dataset. 
+
+```{r}
+# fitting a quadratic model
+fit.lm2 <- lm(mpg ~horsepower + I(horsepower^2), data=train_data)
+
+y_hat2 <- predict(fit.lm2, newdata = train_data)
+MSE_train2 <- MSE(train_data$mpg, y_hat2)
+
+test_y_hat2<- predict(fit.lm2, newdata = test_data)
+MSE_test2 <- MSE(test_data$mpg, test_y_hat2)
+
+print(MSE_train2)
+print(MSE_test2)
+```
+
+```{r}
+# fitting a cubic model
+fit.lm3 <- lm(mpg ~horsepower + I(horsepower^3), data=train_data)
+
+y_hat3 <- predict(fit.lm3, newdata = train_data)
+MSE_train3 <- MSE(train_data$mpg, y_hat3)
+
+test_y_hat3 <- predict(fit.lm3, newdata = test_data)
+MSE_test3 <- MSE(test_data$mpg, test_y_hat3)
+
+print(MSE_train3)
+print(MSE_test3)
+```
+
+```{r}
+# fitting higher order polynomial models
+## Try 10 models with different polynomial degrees
+lm.list = list() # Save all 10 models in a list
+testmse = c() # test mse for all models
+trainmse = c() # train mse for all models
+
+for (i in 1:10)
+{
+  lm.list[[i]] = lm( mpg ~ poly (horsepower, i), data = train_data ) # train models
+  
+  y_head_test = predict(lm.list[[i]], test_data) # compute predictions for test data
+  y_head_train = predict(lm.list[[i]], train_data) # compute predictions for training data
+  
+  testmse[i]= MSE(test_data$mpg,y_head_test) # compute test mse and store it in testmse[i]
+  trainmse[i]= MSE(train_data$mpg,y_head_train) # compute training mse and store it in trainmse[i]
+  
+}
+
+```
+
+Now let's see how models with different degrees of flexibility perform. 
+
+```{r}
+# Plot results
+plot(trainmse,type="l")
+lines(testmse)
+
+
+## Plot trainmse and testmse using ggplot2
+library(ggplot2)
+
+# Merge testmse and trainmse in dataframe
+mse = data.frame(x=1:length(trainmse),testmse,trainmse) 
+
+# Plot results
+ggplot(mse, aes(x)) +                    
+  geom_line(aes(y=testmse, colour="Test MSE")) +
+  geom_line(aes(y=trainmse, colour="Train MSE")) +
+  labs(y = "MSE", x = "Flexibility (Degree of Polynomial)")
+```
+```{r}
+print(mse)
+```
+
+What happened here?  If we train our data with an increasing level of flexibility, the MSE of the training data will decrease. The MSE of the test data on the other hand decreases at first, but then starts increasing again after the fifth iteration. Why? This is a sign of overfitting the training data, which results in poorer outcomes in the test data as the model tries to hard to find patterns and ends up picking up outliers as trends in the data that don't exist in the true relationship between the input and output variables. 
+Without going too much into the mathematical reasoning behind this, we will leave this part here by saying that while in more flexible models there will be less bias, there will also be high variance. In a linear model, this will be the opposite case: high bias and low variance. This is why a higher degree polynomial model will perform poorly on new data as it will falsely recognize random signal as pattern. 
+
+
+We will talk about cross validation as a possible solution to arrive at minimizing the error rate of our model in chapter 3.

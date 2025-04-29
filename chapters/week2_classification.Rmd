@@ -1,0 +1,344 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+### WEEK II
+#### CLASSIFICATION
+
+In the previous notebook, we covered linear regression as a tool that predicts a continuous y outcome. In this notebook, we will learn and practice how to predict a categorical or discrete outcome as a function of the dependent variables using the logistic regression method.
+
+In a logistic regression model, the predicted outcome is a probability, which we can use to arrive at the - probability of a categorical event taking place i.e.  political candidate A, B, or C coming on top of election results or -the probability of binary outcome of an event happening. 
+
+
+
+
+__The logit function__
+
+In its essence, logistic regression predicts a probability that take on a value between 0 and 1. Logistic regression works with the inverse of the logit function, or the sigmoid function.
+\begin{equation}
+p = \frac{1}{1 + e^{-(\beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots + \beta_n x_n)}}
+\end{equation}
+
+__Estimating the parameters__
+
+Recall that linear regression uses the OLS approach to estimate coefficients. In logistic regression, we use the **Maximum Likelihood Estimation** method to figure out the coefficients, which we then use to calculate probabilities.
+
+In R, we will use the `glm` package to fit a logistic regression model to our data. But before we do that, let's have a cursory look at the dataset first.
+
+### First look at the dataset
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+# load the default dataset
+default_data <- ISLR2::Default
+summary(default_data)
+str(default_data)
+```
+Our dataset contains two numerical and two factor variables. In this exercise we are interested in predicting those who default among customers. Let's visualize the data as two separate boxplots exploring default balance and income of customers by default status. 
+
+```{r}
+# first set up the plot grid using par() function
+par(mfrow = c(1, 2))
+
+# boxplot for balance vs. default status
+boxplot(balance ~ default, data = default_data, 
+        main = " Balance by Default Status", 
+        xlab = "Default Status", ylab = "Balance", 
+        col = c("lightblue", "lightpink"))
+
+# boxplot for income vs. default status
+boxplot(income ~ default, data = default_data, 
+        main = "Income by Default Status", 
+        xlab = "Default Status", ylab = "Income", 
+        col = c("lightgreen", "lightcoral"))
+```
+
+What do these boxplots tell us about the distribution of the default data? Income level of a customer does not play a big part in whether of not the customer defaults. Median income level both those who default and those who not are on par, and interquartile ranges of both groups are similar. There is more variance in default status if we consider bank balance as a predictor. 
+
+### Setting up the model
+Let's move on to modelling the default status of customers using their bank balance. We will now split the data into train and test, set up logistic regression and train our model.
+
+```{r}
+# set up the train-test split
+n <- nrow(default_data)
+n_train <- 7000 # take 70 percent of the total dataset for training
+n_test <- 3000 # remaining 30 percent will be for testing
+
+```
+
+```{r}
+# set seed for reproducibility
+set.seed(1)
+train_sample <- sample(n, n_train)
+train_data <-default_data[train_sample,]
+test_data <-default_data[-train_sample,]
+```
+
+Before we proceed to fitting a model, let's first compute the proportion of those who defaulted for both train and test set. This will help us make comparisons to the outcome we get from our model predictions.
+
+```{r}
+defaulting_train <- mean(train_data$default == "Yes")
+defaulting_test <- mean(test_data$default == "Yes")
+                         
+paste("Train data percentage of defaulting:", round(defaulting_train, 5))
+paste("Test data percentage of defaulting: ", round(defaulting_test, 5))
+
+```
+
+### Fitting the logistic regression
+
+Now we will fit a logistic regression to our training data, using first using income as a predictor.
+
+```{r}
+glm.fit <- glm(default ~ income, data = train_data, family = binomial)
+summary(glm.fit)
+```
+
+__How should we interpret the coefficients?__
+
+In the first part of this notebook, we mentioned Maximum Likelihood Estimation as the method that we use to arrive at probabilities. Let's dive deeper into this now as we deal with coefficients of the model. 
+
+In linear regression, coefficients told us the amount of change expected in the response variable _y_ with each 1 unit change in the predictor variable _x_. In a logistic regression model, estimated coefficients tell us how a predictor _balance_ influence the log-odds of the _y_ variable _default_. This relationship is less direct to understand than the output of a linear regression model and to arrive at a binary classifier, predicted log-odds found by the MLE still need to be converted to probabilities with the help of the inverse of the logit or sigmoid function.
+
+Going back to the coefficients now. Based on the output given by the model summary, `income` has a negative relationship to default risk. With every 1 unit change in income, log-odds of default risk decreases by a very tiny number of 0.000002245. This is practically zero. Further looking at the output, the high p-value of 0.655 associated with `income`, the effect cannot be said to be statistically significant. Therefore we can deduce that this predictor does not have an effect on default risk.
+
+
+__Calculating the default risk using income__
+
+The first part of the code below calculates the probabilities from the estimated log-odds by the model. However, remember that logistic regression is used to predict a binary class _yes_ or _no_. So using the probabilities the MLE gave us, we will compute a binary prediction for our observations based on a threshold of 0.50.
+
+```{r}
+glm.train_prob <- predict(glm.fit, type = "response", newdata = train_data)
+glm.train_pred <- rep("No", nrow(train_data))
+glm.train_pred[glm.train_prob > 0.5] = "Yes"
+```
+
+The 0.50, or 50 percent threshold sounds arbitrary, but it is not. 
+
+
+__Visualizing the sigmoid function__
+
+Let's see the sigmoid function in action and see how our data is fit to the S-curve and how the model's predictions compare to the actual data.
+
+```{r}
+# library(ggplot2)
+# # first create a new column in the original df with predicted probabilities
+# train_data$predicted_prob <- glm.train_prob
+# 
+# # create the plot to visualiza the sigmoid function
+# ggplot(train_data, aes(x = income, y = as.numeric(default) - 1)) +
+#   geom_point(alpha = 0.5, color = 'blue') + # Data points
+#   geom_line(aes(y = predicted_prob), color = 'red', linewidth = 1) + # Sigmoid curve
+#   labs(title = "Logistic Regression Model with Sigmoid Function",
+#        x = "Income",
+#        y = "Probability of Default") +
+#   theme_minimal()
+```
+
+
+Keeping to our usual protocol, we will fit the train model to make predictions on the test data and evaluate its performance.
+
+```{r}
+glm.test_prob <- predict(glm.fit, type = "response", newdata = test_data)
+glm.test_pred <- rep("No", nrow(test_data))
+glm.test_pred[glm.test_prob > 0.5] = "Yes"
+
+```
+
+#### Error rate and accuracy
+
+Remember that in a linear regression model, the cost function Mean Squared Error (MSE) gave us an indication as to the performance of the model. This does not work in logistic regression since the _y_ response we are predicting is a categorical (qualitative) variable. We can however follow a similar logic and arrive at an error rate by rationing the number of wrong predictions to the total number of predictions.
+
+$$
+\text{Error Rate} = \frac{\text{Number of wrong predictions}}{\text{Total number of predictions}}
+$$
+Another measure of model performance is accuracy rate, which is the mirror image or error rate and has the simple formula: 
+
+$$
+\text{Accuracy Rate} = \frac{\text{Number of correct predictions}}{\text{Total number of predictions}} = 1 - \text{Error Rate} \
+$$
+
+Let's apply all of this and calculate the error rate and accuracy of our model.
+
+__For the training set__
+```{r}
+error_rate_train <- mean(glm.train_pred != train_data$default)
+paste("In-sample error rate:", round(error_rate_train, 5))
+#
+accuracy_train <- mean(glm.train_pred == train_data$default)
+paste("In-sample accuracy:  ", round(accuracy_train, 5))
+```
+
+__For the test set__
+```{r}
+# Compute the out-of-sample error_rate and accuracy
+error_rate_test <- mean(glm.test_pred != test_data$default)
+paste("Out-of-sample error rate:", round(error_rate_test, 5))
+# Accuracy
+accuracy_test <- mean(glm.test_pred == test_data$default)
+paste("Out-of-sample accuracy:  ", round(accuracy_test, 5))
+```
+
+
+### Using balance to predict the response
+
+Earlier we visualized the default outcome by looking at both the `income` and `balance`of bank customers. Interpreting the boxplot, we concluded that `balance` had a stronger relationship to the outcome `default`than `income`, which -----. 
+
+Now train our data using `balance` as a predictor and compare the results.
+```{r}
+glm.fit2 <- glm(default ~ balance, data = train_data, family = binomial)
+summary(glm.fit2)
+```
+__How does balance compare to income as a predictor?__
+
+Early in the notebook we have already seen from the boxplots we created that `balance` was a more relevant variable than `income` when predicting the response variable `default`. Now that we trained two different models separately on these two predictors, we see that the coefficients of these models also confirm this. `balance` is associated with a lower p value compared to `income`, which tells us `balance`is a statistically significant variable for predicting `default`. The slope of 5.405 tells us that with each one-unit increase in balance, the log-odds of default probability increases by 5.405 unit. We already talked about this before but it's worth repeating: this figure only tells us the log-odds of default risk, and not the probability. To calculate the probability associated with each observation of the balance variable, we still need to compute probabilities from log-odds using the inverse of the logit function. The code below does exactly that.
+
+
+Train the model first:
+```{r}
+glm.train_prob2 <- predict(glm.fit2, type = "response", newdata = train_data)
+glm.train_pred2 <- rep("No", nrow(train_data))
+glm.train_pred2[glm.train_prob2 > 0.5] = "Yes"
+```
+
+Fit the model to the test set:
+```{r}
+glm.test_prob2 <- predict(glm.fit2, type = "response", newdata = test_data)
+glm.test_pred2 <-rep("No", nrow(test_data))
+glm.test_pred2[glm.test_prob2 > 0.5] = "Yes"
+```
+
+Calculate error rate for both:
+```{r}
+# Compute the in-sample error_rate and accuracy
+error_rate_train2 <- mean(glm.train_pred2 != train_data$default)
+
+# Compute the out-of-sample error_rate and accuracy
+error_rate_test2 <- mean(glm.test_pred2 != test_data$default)
+
+
+# Print the In-sample results
+paste("In-sample error rate:", round(error_rate_train2, 5))
+
+# Print the Out-of-sample results
+paste("Out-of-sample error rate:", round(error_rate_test2, 5))
+```
+
+ 
+__Calculating the probability of default from a specific balance__
+
+Suppose that we want to predict the probability of default given a specific credit card balance - let's say a customer with a balance of 1,000 USD. While we appreciate that with only three lines of code we are able to calculate probabilities and then predict a binary class for them in R, it's always useful to manually calculate to see its working. To be able do that we will extract coefficients of the model, calculate the log-odds using the logistic regression formula, and finally convert them to probabilities using the logit function. 
+
+
+```{r}
+# First let's get the coefficients for y intercept and balance
+coefficients <- coef(glm.fit2)
+beta0 <- coefficients[1]
+beta1 <- coefficients[2]
+
+# Specify the balance
+balance <- 1000
+
+# Calculate log-odd
+logit_p <- beta0 + beta1 * balance
+
+# Convert log-odd to probability
+prob_balance <- 1/ (1 + exp(-logit_p))
+print(paste("Probability of default with this balance is:", prob_balance))
+```
+
+A customer with a credit card balance of 1,000 USD has a less than 1% probability of defaulting according to our model.
+
+
+__Visualizing the sigmoid function__
+We have calculated the probabilities and converted them to binary responses yes or no by using the inverse of the logit, or the Sigmoid function. How does this look like on our data? Let's see the sigmoid function in action and see how our data is fit to the S-curve and how the model's predictions compare to the actual data. 
+
+```{r}
+library(ggplot2)
+# first create a new column in the original df with predicted probabilities
+train_data$predicted_prob2 <- glm.train_prob2
+
+# create the plot to visualiza the sigmoid function
+ggplot(train_data, aes(x = balance, y = as.numeric(default) - 1)) +
+  geom_point(alpha = 0.5, color = 'blue') + # Data points
+  geom_line(aes(y = predicted_prob2), color = 'red', linewidth = 1) + # Sigmoid curve
+  labs(title = "Logistic Regression Model with Sigmoid Function",
+       x = "Balance",
+       y = "Probability of Default") +
+  theme_minimal()
+```
+
+
+
+The model classifies customers with a credit card balance of just below 2,000 USD at the risk of default. 
+
+__Logistic regression with more than 1 variable__
+
+So far we modelled our classifier regression using income and balance separately. What if we were to use both of these variables as predictors? Let's modify our model and observe the outcome. 
+
+Train the model and fit it to test: 
+```{r}
+glm.fit3 <- glm(default ~ income + balance + student, data = train_data, family = binomial)
+
+glm.train_prob3 <- predict(glm.fit3, type = "response", newdata = train_data)
+glm.test_prob3 <- predict(glm.fit3, type = "response", newdata = test_data)
+
+# Compute predictions for train set
+glm.pred_train3 <- rep("No", nrow(train_data))
+glm.pred_train3[glm.train_prob3 > 0.5] = "Yes"
+
+# Compute predictions for test set
+glm.pred_test3 <- rep("No", nrow(test_data))
+glm.pred_test3[glm.test_prob3 > 0.5] = "Yes"
+
+```
+
+Now calculate the error rate for both:
+```{r}
+# Compute the in-sample error_rate and accuracy
+error_rate_train3 <- mean(glm.pred_train3 != train_data$default)
+
+# Compute the out-of-sample error_rate and accuracy
+error_rate_test3 <- mean(glm.pred_test3 != test_data$default)
+
+
+# Print the In-sample results
+paste("In-sample error rate:", round(error_rate_train3, 5))
+
+# Print the Out-of-sample results
+paste("Out-of-sample error rate:", round(error_rate_test3, 5))
+```
+
+__Which model yielded the better results?__
+
+We will use error rate as the loss function to decide on the best performing model among the three. Let's put everything in a single dataframe.
+```{r}
+# Create data frames for each model
+model_with_income <- data.frame(Model = "income", 
+                        train_error_rate = error_rate_train, 
+                        test_error_rate = error_rate_test)
+
+model_with_balance <- data.frame(Model = "balance",
+                                train_error_rate = error_rate_train2, 
+                                test_error_rate = error_rate_test2)
+
+model_with_income_and_balance <- data.frame(Model = "income + balance + student",
+                         train_error_rate = error_rate_train3, 
+                         test_error_rate = error_rate_test3)
+
+# Combine the data frames into a single data frame
+results_table <- do.call(rbind, list(model_with_income, model_with_balance, model_with_income_and_balance))
+
+# Rename column headers
+colnames(results_table) <- c("Model", "Train error rate", "Test error rate")
+
+# Print the resulting data frame
+print(results_table)
+```
+
+summary(glm.fit3)
