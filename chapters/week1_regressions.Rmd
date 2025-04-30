@@ -1,8 +1,8 @@
 ---
-title: "R Notebook"
-output:
-  html_document:
-    df_print: paged
+title: "Week 1 Regressions"
+output: html_document
+---
+
 ---
 
 ```{r setup, message=FALSE}
@@ -47,7 +47,8 @@ summary(model)
 
 __Visualizing the fitted line and model__
 
-Scatterplots are a useful tool when it comes to visualizing the relationship between a predictor and the response variable. The red line below is the regression line that OLS found to be the best fit.
+Scatterplots are a useful tool when it comes to visualizing the relationship between a predictor and the response variable. The red line below is the regression line that OLS found to be the best fit.rmarkdown::render("week1/week1_regressions.Rmd")
+
 
 ```{r}
 # visualize the model as a scatterplot and fit the regression line
@@ -321,6 +322,7 @@ print(mse)
 
 What happened here?  If we train our data with an increasing level of flexibility, the MSE of the training data will decrease. The MSE of the test data on the other hand decreases at first, but then starts increasing again after the fifth iteration. Why? This is a sign of overfitting the training data, which results in poorer outcomes in the test data as the model tries to hard to find patterns and ends up picking up outliers as trends in the data that don't exist in the true relationship between the input and output variables. 
 Without going too much into the mathematical reasoning behind this, we will leave this part here by saying that while in more flexible models there will be less bias, there will also be high variance. In a linear model, this will be the opposite case: high bias and low variance. This is why a higher degree polynomial model will perform poorly on new data as it will falsely recognize random signal as pattern. 
+
 
 
 We will talk about cross validation as a possible solution to arrive at minimizing the error rate of our model in chapter 3.

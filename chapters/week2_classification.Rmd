@@ -1,6 +1,6 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Week 2 Classification"
+output: html_document
 ---
 
 ### WEEK II
